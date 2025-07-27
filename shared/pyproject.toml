@@ -1,0 +1,14 @@
+[project]
+name = "shared-plugin-system"
+version = "1.0.0"
+description = "Shared module with plugin system support"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+shared-demo = "main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

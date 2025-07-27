@@ -1,0 +1,18 @@
+[project]
+name = "plugin2"
+version = "0.1.0"
+description = "Country-specific plugin system with selective loading"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.entry-points."plugin2.countries"]
+cz = "country_specific.cz"
+hu = "country_specific.hu"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["shared*", "country_specific*"]
