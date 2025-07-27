@@ -47,7 +47,7 @@ def override_required(func: Callable[..., Any]) -> Callable[..., Any]:
             )
 
         # If overridden, call the actual implementation
-        return current_method(*args, **kwargs)
+        return current_method(*args, **kwargs) # type: ignore[return-value]
 
     # Mark the function as override required for introspection
     setattr(wrapper, "__override_required__", True)
