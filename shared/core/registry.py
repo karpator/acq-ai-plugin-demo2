@@ -182,13 +182,55 @@ class PluginRegistry:
 T = TypeVar("T", bound=type)
 
 
+class PluggableMeta(type):
+    """
+    Metaclass for pluggable classes that intercepts class-level attribute access
+    to redirect static/class methods to plugin implementations.
+    """
+    
+    def __getattribute__(cls, name: str) -> Any:
+        # Skip special attributes and internal attributes to avoid recursion
+        if (name.startswith('__') or name.startswith('_') or 
+            name in ('mro', 'register', '__dict__', '__class__')):
+            return super(PluggableMeta, cls).__getattribute__(name)
+        
+        # Only check for plugins if this is marked as pluggable
+        # Use super() to avoid recursion when checking _is_pluggable
+        try:
+            is_pluggable = super(PluggableMeta, cls).__getattribute__('_is_pluggable')
+        except AttributeError:
+            is_pluggable = False
+            
+        if is_pluggable:
+            # Get the registry
+            registry = PluginRegistry()
+            plugin_class = registry.get_plugin_class(cls)
+            
+            # If we have a plugin different from the base class
+            # Compare by name since the classes might be different types
+            if plugin_class.__name__ != cls.__name__ or plugin_class.__module__ != cls.__module__:
+                # Check if the plugin has this attribute in its own __dict__ (not inherited)
+                if name in plugin_class.__dict__:
+                    plugin_attr = plugin_class.__dict__[name]
+                    
+                    # If it's a classmethod or staticmethod, use the descriptor protocol to get the bound version
+                    if isinstance(plugin_attr, classmethod):
+                        return plugin_attr.__get__(None, plugin_class)  # type: ignore[return-value]
+                    elif isinstance(plugin_attr, staticmethod):
+                        return plugin_attr.__get__(None, plugin_class)  # type: ignore[return-value]
+        
+        # For everything else, return the base attribute
+        return super(PluggableMeta, cls).__getattribute__(name)
+
+
 def pluggable(cls: T, *, metadata: Optional[Dict[str, Any]] = None) -> T:
     """
     Decorator to mark a class as pluggable.
 
     This decorator registers a class with the plugin registry as eligible
     for plugin overrides. The class __new__ method is modified to return
-    plugin instances when available.
+    plugin instances when available, and the metaclass handles static/class
+    method redirection to plugins.
 
     Args:
         cls: The class to mark as pluggable
@@ -201,6 +243,21 @@ def pluggable(cls: T, *, metadata: Optional[Dict[str, Any]] = None) -> T:
     def decorator(target_class: T) -> T:
         registry = PluginRegistry()
         registry.register_pluggable(target_class, metadata)
+
+        # Create a new class with the PluggableMeta metaclass
+        new_class = PluggableMeta(
+            target_class.__name__,
+            target_class.__bases__,
+            dict(target_class.__dict__)
+        )
+        
+        # Mark it as pluggable for the metaclass
+        new_class._is_pluggable = True  # type: ignore[attr-defined]
+        
+        # Copy over the original class attributes
+        for attr_name, attr_value in target_class.__dict__.items():
+            if not attr_name.startswith('__') or attr_name in ('__module__', '__qualname__', '__doc__'):
+                setattr(new_class, attr_name, attr_value)
 
         # Store original __new__ method
         original_new = target_class.__new__
@@ -222,8 +279,8 @@ def pluggable(cls: T, *, metadata: Optional[Dict[str, Any]] = None) -> T:
                     instance = original_new(cls, *args, **kwargs)  # type: ignore[misc]
                 return instance  # type: ignore[return-value]
 
-        target_class.__new__ = staticmethod(plugin_aware_new)  # type: ignore[method-assign]
-        return target_class
+        new_class.__new__ = staticmethod(plugin_aware_new)  # type: ignore[method-assign]
+        return new_class  # type: ignore[return-value]
 
     return decorator(cls)
 

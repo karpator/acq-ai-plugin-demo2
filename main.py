@@ -68,11 +68,16 @@ def main():
 
         # Test greetings
         hello_msg = greeter.say_hello("World")
+        hello_msg2 = greeter.say_hello2()
         goodbye_msg = greeter.say_goodbye("World")
+        message_end = Greet.message_end()
+
 
         print(f"Hello: {hello_msg}")
+        print(f"Hello Version 2: {hello_msg2}")
         print(f"Goodbye: {goodbye_msg}")
         print(f"Implementation: {info['class']} ({info.get('country', 'unknown')})")
+        print(f"Message end: '{message_end}'")
         print()
 
         # For Hungarian addresses, use 4-digit postal codes
